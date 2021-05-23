@@ -1,0 +1,262 @@
+---
+title: "TP2"
+author: "Vivien"
+date: "23/05/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+
+```{r init, include=FALSE}
+library(PBImisc)
+data("apartments")
+apartments <- apartments[which(is.na(apartments$n.rooms)==FALSE),]
+apartments <- apartments[which(is.na(apartments$transaction.price)==FALSE),]
+apartments <- apartments[which(is.na(apartments$construction.date)==FALSE),]
+apartments <- apartments[which(is.na(apartments$surface)==FALSE),]
+```
+
+# Level 1
+
+implement the least squares estimator $\hat \beta$ of the parametric component with a given kernel (e.g. naive) and a given bandwidth $h$.
+
+```{r noyau, echo=FALSE}
+K_naif <- function(y){
+  valeur <- 0
+  if (y <= 1 & y >= -1) {
+    valeur <- 1/2
+  }
+  return(valeur)
+}
+```
+
+```{r largeur_de_bande, echo=FALSE}
+h <- 1 # envrion 20% ; règle du pouce
+```
+
+On utlise la représentation matricielle :
+ 
+$\hat \beta = [X^t(I_n-S)²X]^{-1}X^t(I_n-S)²Y$
+
+```{r Matrices, echo=TRUE}
+X <- cbind(apartments$construction.date, apartments$surface) 
+X_t <- t(X)
+n <- length(X[,1])
+I_n <- diag(x = 1, nrow = n, ncol =n)
+Y <- apartments$transaction.price
+Z <- apartments$n.rooms
+
+
+denominateur_S <- c()
+for (i in 1:n) {
+  denominateur_S <- c(denominateur_S, sum(sapply((Z - Z[i])/h, K_naif)))
+  }
+
+S <- matrix(data = NA, nrow = n, ncol = n)
+for (i in 1:n) {
+  for (j in 1:n) {
+    S[i,j] <-  (K_naif((Z[i] - Z[j])/h))/denominateur_S[i]
+  }
+}
+```
+
+Soient : 
+
+_ X comportant la date de construction et la surface
+_ Y le prix de du bien immobilier
+_ Z le nombre de pièces
+
+```{r Moindres_carrés, echo=TRUE}
+Beta_chapeau <- solve(X_t %*% (I_n - S)**2 %*% X) %*% X_t %*% (I_n - S)**2 %*% Y
+```
+
+On trouve les coefficients suivants pour la date de la construction et la surface :
+
+`r Beta_chapeau`
+
+# Level 2
+
+Write a function, whose arguments should be a sample of data, a vector $b$ and a point $z$, which returns the kernel estimator of the regression function $\mathbb E(Y - X^T b| Z = z)$ at the point $z$ with this same kernel and bandwidth.
+
+
+Il ne nous reste plus qu'à estimer la fonction g à travers la formule suivante :
+
+$\hat g(z) = \frac{\sum_{j=1}^n (Y_j-X_j \hat \beta)K \left( \frac{Z_j-z}{h} \right)}{K \left( \frac{Z_j-z}{h} \right)}$
+
+```{r Q2, echo=TRUE}
+Different_Z <- Z[duplicated(Z)==FALSE]
+numerateur_g <- c()
+denominateur_g <- c()
+
+g_chapeau <- function(gY = Y, gX = X, gZ = Z, b = Beta_chapeau, z, gh = h){
+  for (i in 1:n) {
+    
+  
+  numerateur_g <- c(numerateur_g, (gY[i] - t(gX)[,i] %*% b) * K_naif( (gZ[i] - z) /gh) )
+  denominateur_g <- c(denominateur_g, K_naif( (gZ[i] - z) /gh) )
+  }
+return(sum(numerateur_g) / sum(denominateur_g))
+}
+
+# g_chapeau(z = 1) ; g_chapeau(z = 2) ; g_chapeau(z = 3) ; g_chapeau(z = 4) ; g_chapeau(z = 5) ; g_chapeau(z = 6) ; g_chapeau(z = 9)
+```
+
+
+# Level 3
+
+Combine your codes in Levels 1 and 2 to write a function, whose arguments should be a sample of data and a point z, which returns the kernel estimator of the regression function $g(z) = \mathbb E(Y - X^t \beta | Z =z) $
+
+
+
+On a pris bon soin de mettre comme arguments par défaut les quantités précédentes.
+
+# Level 4 
+
+Upgrade your code in Level 3, first by including as arguments in this function the kernel function (within a reasonable list of kernels) and the bandwidth h, and then by allowing a second, different choice of bandwidth for the estimation of the regression function g by cross-validation.
+
+## Noyaux
+
+On choisit les noyaux d'Epanechnikov, Tricube et gaussien.
+
+```{r noyaux, echo=TRUE}
+K_epanechnikov <- function(x){
+  valeur <- 0
+  if (x <= 1 & x >= -1) {
+   valeur <- 0.75*(1 - x**2) 
+  }
+  return(valeur)
+}
+
+K_tricube <-  function(x){
+  valeur <- 0
+  if (x <= 1 & x >= -1) {
+   valeur <- 35/32*(1 - x**2)**3 
+  }
+  return(valeur)
+}
+
+K_gaussien <-  function(x){
+    return(1/sqrt(2*pi)*exp(-1/2 * x**2))
+}
+```
+
+## Validation croisée
+
+On cherche à minimiser $CV = \frac{1}{n}\sum_{i=1}^n \left(  Y_i - X_{i,1} \hat \beta_1 - X_{i,2} \hat \beta_2 - \hat g_{-i}(Z_i)  \right)$ pour un certain h.
+
+
+calculons tout d'abord $\hat g_{-i}(Z_i)$ :
+
+```{r g_moins_i, echo=TRUE}
+g_chapeau_moins_i <- function(gY = Y, gX = X, gZ = Z, b = Beta_chapeau, z, choix_noyaux = "Epanechnikov", gh = h){
+  if (choix_noyaux == "Epanechnikov") {
+    noyau <- K_epanechnikov
+  }
+  if (choix_noyaux == "Tricube") {
+    noyau <- K_tricube
+  }  
+  if (choix_noyaux == "Gaussien") {
+    noyau <- K_gaussien
+  }
+
+  for (i in 1:n) {
+    
+  numerateur_g <- c(numerateur_g, (gY[i] - t(gX)[,i] %*% b) * noyau( (gZ[i] - z) /gh) )
+  numerateur_g <- numerateur_g[-i]
+  denominateur_g <- c(denominateur_g, noyau( (gZ[i] - z) /gh) )
+  denominateur_g <- denominateur_g[-i]
+  }
+  
+return(sum(numerateur_g) / sum(denominateur_g))
+}
+
+
+```
+
+
+
+
+puis $CV$ :
+
+```{r CV, echo=TRUE}
+CrossValidation <- function(h_cv) {
+  CV <- c()
+  for (i in 1:n) {
+  CV <- c(CV, (Y[i] - X[i,1] * Beta_chapeau[1] - X[i,2] * Beta_chapeau[2] - g_chapeau_moins_i(z = Z[i], gh = h_cv))**2)
+  CV <- sum(CV)/n
+}
+return(CV)
+}
+
+hhhhhhhhh <- sapply(seq(3, 4, by = 0.2), CrossValidation)
+h_opti <- seq(1, 4, by = 0.2)[which(abs(hhhhhhhhh)==min(abs(hhhhhhhhh)))]
+```
+
+le $h$ optimal par validation croisée pour $g$ est `r h_opti`
+
+
+
+
+
+```{r Q4, echo=TRUE}
+g_chapeau <- function(gY = Y, gX = X, gZ = Z, b = Beta_chapeau, z, choix_noyaux = "Epanechnikov", gh){
+  if (choix_noyaux == "Epanechnikov") {
+    noyau <- K_epanechnikov
+  }
+  if (choix_noyaux == "Tricube") {
+    noyau <- K_tricube
+  }  
+  if (choix_noyaux == "Gaussien") {
+    noyau <- K_gaussien
+  }
+
+  for (i in 1:n) {
+    
+  numerateur_g <- c(numerateur_g, (gY[i] - t(gX)[,i] %*% b) * noyau( (gZ[i] - z) /gh) )
+  denominateur_g <- c(denominateur_g, noyau( (gZ[i] - z) /gh) )
+  }
+  
+return(sum(numerateur_g) / sum(denominateur_g))
+}
+```
+
+
+```{r plot_g, echo=FALSE}
+absci <- c(1,2,3,4,5,6,9)
+ordo <- c(g_chapeau(z = 1, gh = h_opti), g_chapeau(z = 2, gh = h_opti), g_chapeau(z = 3, gh = h_opti), g_chapeau(z = 4, gh = h_opti), g_chapeau(z = 5, gh = h_opti), g_chapeau(z = 6, gh = h_opti), g_chapeau(z = 9, gh = h_opti))
+
+plot(absci, ordo, type = "l", main = "g(z) ; h par vc", xlab = "Nombre de pièces", ylab = "g(z)")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
