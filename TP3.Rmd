@@ -1,0 +1,42 @@
+---
+title: "TP3"
+author: "Vivien"
+date: "09/05/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Niveau 1
+
+Write a function, whose arguments should be a sample of data, a vector b and
+a point z, which returns the list of all leave-one-out kernel estimators of the regression
+function $E(Y - X^t \beta | Z=z)$ at the point z, with a given kernel (e.g. naive) and a given
+bandwidth h. [There should be as many elements in this list as there are data points.]
+
+
+```{r init, include=FALSE}
+library(np)
+data("wage1")
+```
+
+```{r noyau_naïf, echo=FALSE}
+naif <- function(z){
+  densite <- 0
+  if (x >= -1 & x <= 1) {
+    densite <- 1/2
+  }
+  return(densite)
+}
+```
+
+```{r largeur_de_bande, echo=FALSE}
+h <- 2.5
+```
+
+```{r }
+
+```
+

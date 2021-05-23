@@ -1,0 +1,121 @@
+---
+title: "TP1"
+author: "Vivien"
+date: "05/05/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r donnees, include=FALSE}
+library(MASS)
+data("geyser")
+```
+
+```{r plot_donnees, echo=FALSE}
+plot(geyser$waiting, geyser$duration, main = "Temps entre la prochaine éruption et la durée de la précédente", xlab = "Temps jusqu'à l'éruption suivante", ylab = "Temps de l'éruption")
+```
+
+# Niveau 1 et 2
+
+On cherche à implémenter l'estimateur par polynômes locaux de degré 1. Ce dernier s'écrit de la forme :
+
+$\hat{m}_1(x)=\frac{\sum_{i,j=1}^n Y_i (X_j-x) (X_j-X_i) K(\frac{X_i-x}{h}) K(\frac{X_j-x}{h}) }{\sum_{i,j=1}^n (X_j-x) (X_j-X_i) K(\frac{X_i-x}{h}) K(\frac{X_j-x}{h}) }$
+
+On choisi $h=5$ de manière arbitraire ; K le noyau naïf $K(x) = \frac{1}{2} \mathcal{1}_{ \{ x \in [-1;1] \} }$ ; et $x_0$ un point quelconque.
+
+```{r implementation_niveau_1, echo=TRUE}
+h <- 10
+
+K_naif <- function(y){
+  valeur <- 0
+  if (y <= 1 & y >= -1) {
+    valeur <- 1/2
+  }
+  return(valeur)
+}
+
+
+Estim_Poly_Local <- function(x){
+  
+  denom <- 0 ; denom2 <- 0 ; denom3 <- 0 ; num <- 0 ; num1 <- 0 ; num2 <- 0 ; num3 <- 0 
+  
+  for (j in 1:length(geyser$waiting)) {
+    
+    denom1 <- K_naif((geyser$waiting[j] - x)/h)*(geyser$waiting[j]-x)
+    num1 <-  K_naif((geyser$waiting[j] - x)/h)*(geyser$waiting[j]-x)
+  
+    for (i in 1:length(geyser$waiting)) {
+      
+      denom2 <- denom2 + (geyser$waiting[j] - geyser$waiting[i])*(K_naif((geyser$waiting[i] - x)/h))
+      num2 <- num2 + geyser$duration[i]*(geyser$waiting[j] - geyser$waiting[i])*(K_naif((geyser$waiting[i] - x)/h))
+    }
+  
+    denom3 <- denom1*denom2
+    num3 <- num1*num2
+    
+    denom <- denom + denom3
+    num <- num + num3
+  }
+  
+  return(num/denom)
+}
+
+```
+
+
+```{r}
+niv1 <- sapply(geyser$waiting, Estim_Poly_Local)
+```
+
+
+```{r}
+plot(geyser$waiting, geyser$duration)
+lines(geyser$waiting, niv1, col="red", type="p")
+```
+
+# Niveau 3
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
