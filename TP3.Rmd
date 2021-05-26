@@ -17,13 +17,24 @@ function $E(Y - X^t \beta | Z=z)$ at the point z, with a given kernel (e.g. naiv
 bandwidth h. [There should be as many elements in this list as there are data points.]
 
 
+On simule des données telles que : $Y = \frac{e^{(X_1+X_2-100)}}{X_1+X_2} + \epsilon$
+
 ```{r init, include=FALSE}
-library(np)
-data("wage1")
+n <- 1500
+X1 <- runif(n = n, min = -5, max = 60)
+X2 <- rexp(n = n, rate = 2)
+X <- rbind(X1,X2)
+X_t <- t(X)
+epsi <- rnorm(n = n, mean = 0, sd = 5)
+Y <- cos(X1+X2) + epsi
+
+h <- max(X1 + X2)- min(X1 + X2)
+
+b <- rbind(1,2)
 ```
 
 ```{r noyau_naïf, echo=FALSE}
-naif <- function(z){
+naif <- function(x){
   densite <- 0
   if (x >= -1 & x <= 1) {
     densite <- 1/2
@@ -32,11 +43,123 @@ naif <- function(z){
 }
 ```
 
-```{r largeur_de_bande, echo=FALSE}
-h <- 2.5
+Soit $\hat g_{b, -i}(z) = \frac{\sum_{i \ne j} Y_j K  \left( \frac{X_j^Tb - z}{h}  \right) }{\sum_{i \ne j}  K \left( \frac{X_j^Tb - z}{h}  \right)}$
+
+```{r Q1, echo=TRUE}
+g_initiale <- function(vecteur_b = b, z) {
+  g_b_moins_i <- c()
+  for (i in 1:n) {
+    g_b_moins_i <- c(g_b_moins_i, (sum(Y[-i] * sapply((X_t[-i,] %*% vecteur_b - z)/h, naif))) / sum(sapply((X_t[-i,] %*% vecteur_b - z)/h, naif)) )
+  }
+  return(g_b_moins_i)
+}
+
+g_initiale_2 <- function(vecteur_b = b, z, j) {
+  g_b_moins_j <- (sum(Y[-j] * sapply((X_t[-j,] %*% vecteur_b - z)/h, naif))) / sum(sapply((X_t[-j,] %*% vecteur_b - z)/h, naif))
+  return(g_b_moins_j)
+}
 ```
 
-```{r }
+
+
+
+# Level 2
+
+implement the nonlinear least squares estimator $\hat \beta$ of the parametric component of the model, with this same kernel and bandwidth.
+
+
+
+
+Soit $\hat \beta = \underset{b \in B}{argmin} \sum_{i=1}^{n}\left(Y_i - \hat g_{b,-i}(X_i^Tb) \right)²$
+
+
+On définie un vecteur $b = ((1,2)',(1,3)',...,(1,100)')$ et on regarde pour quel $b$, $\hat \beta$ est minimal.
+
+```{r optimis, echo=TRUE}
+nb <- 100
+
+sequence_b <- matrix(data = 0, nrow = 2, ncol = nb)
+sequence_b[1,] <- 1 
+sequence_b[2,1] <- 1
+
+for (k in 2:nb) {
+  sequence_b[2,k] <- 1 + sequence_b[2,k-1]
+} 
+
+
+optimisation <- function(sequence_b_vecteur = sequence_b) {
+  opti_beta_seq <- c()
+  for (k in 1:length(sequence_b_vecteur[1,])) {
+    opti_beta <- c()
+    for (i in 1:n) {
+      opti_beta <- c(opti_beta, (Y[i] - g_initiale_2(vecteur_b = sequence_b_vecteur[,k], z = as.numeric(X_t[i,] %*% sequence_b_vecteur[,k]), j = i)) ** 2)
+    }
+    opti_beta <- sum(opti_beta)
+    opti_beta_seq <- c(opti_beta_seq, opti_beta)
+    
+  }
+  
+  return(sequence_b_vecteur[,which(min(opti_beta_seq) == opti_beta_seq)])
+  
+}
+
+opti_beta <- rbind(1,18)
 
 ```
+
+Le Beta optimal est `r opti_beta`.
+
+# Level 3
+
+write a function, whose arguments should be a sample of data and a point $z$,
+which returns the kernel estimator of the regression function $\mathbb E(Y | X^t \beta = z)$ at the point
+$z$, with this same kernel and bandwidth.
+
+Soit $\hat g(z) = \overset{\sim} {g}_{\hat \beta}(z) = \frac{\sum_{i=1}^n Y_i K \left( \frac{X_i^t \hat \beta - z}{h}  \right)}{\sum_{i=1}^n K \left( \frac{X_i^t \hat \beta - z}{h}  \right)}$
+
+
+```{r g_opti, echo=TRUE}
+g_opti_fun <- function(z) {
+  return(sum(Y * sapply((X_t %*% opti_beta - z)/h, naif))/sum(sapply((X_t %*% opti_beta - z)/h, naif)))
+}
+```
+
+
+
+```{r plot_g, echo=FALSE}
+ordo1 <- sapply(seq(10,1000, by = 0.1) ,g_opti_fun)
+absci1 <- seq(10,1000, by = 0.1)
+
+g_x <- function(x){
+  return(cos(x))
+}
+
+ordo2 <- sapply(seq(10,1000, by = 0.1), g_x)
+
+plot(absci1, ordo1, type = "l", col="red")
+points(absci1, ordo2, type = "l", col="blue")
+
+```
+
+
+
+
+
+
+# comparaison
+
+```{r}
+library(np)
+bw <- npindexbw(formula=Y~X_t[,1]+ X_t[,2], method="ichimura")
+model <- npindex(bws=bw, gradients=TRUE)
+summary(model)
+```
+
+
+
+
+
+
+
+
 

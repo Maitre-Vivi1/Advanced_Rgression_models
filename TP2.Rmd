@@ -236,14 +236,30 @@ plot(absci, ordo, type = "l", main = "g(z) ; h par vc", xlab = "Nombre de pièce
 
 
 
+# Comparaison
+
+```{r comparaison, include=F}
+library(gplm)
+```
+
+
+```{r comparaison2, echo=T}
+kgplm_apart <- kgplm(x = X, t = Z, y = Y, h = 1, method = "speckman", kernel = "epanechnikov")
+```
+
+Le $\beta$ estimé est `r kgplm_apart$b`
+
+Pas très loin en considérant la divergence du noyau et d ela largeur de bande
 
 
 
 
+```{r}
+plot(Z[order(Z, decreasing = F)], kgplm_apart$m[order(Z, decreasing = F)],type="l",col="red")
+```
 
 
-
-
+Pas très loin non plus eu égard aux remarques précédentes.
 
 
 
